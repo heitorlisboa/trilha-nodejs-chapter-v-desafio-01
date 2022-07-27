@@ -2,7 +2,6 @@ import { InMemoryUsersRepository } from '../../../users/repositories/in-memory/I
 import { InMemoryStatementsRepository } from '../../repositories/in-memory/InMemoryStatementsRepository';
 import { GetBalanceUseCase } from './GetBalanceUseCase';
 import { ICreateUserDTO } from '../../../users/useCases/createUser/ICreateUserDTO';
-import { ICreateStatementDTO } from '../createStatement/ICreateStatementDTO';
 import { OperationType } from '../../entities/Statement';
 import { GetBalanceError } from './GetBalanceError';
 
@@ -29,14 +28,31 @@ describe('Get balance use case', () => {
     userId = (await usersRepository.create(user)).id;
   });
 
-  it('should be able to get the user balance', async () => {
-    // Creating a statement
-    const statement = await statementsRepository.create({
-      type: OperationType.WITHDRAW,
+  it('should be able to correctly get the user balance and their statements', async () => {
+    // Creating a deposit statement
+    const depositStatement = await statementsRepository.create({
+      type: OperationType.DEPOSIT,
       amount: 1000,
       description: 'Statement description sample',
-
       user_id: userId,
+    });
+
+    // Creating a transfer statement FROM another user
+    const transferReceiverStatement = await statementsRepository.create({
+      type: OperationType.TRANSFER,
+      amount: 1000,
+      description: 'Statement description sample',
+      user_id: userId,
+      sender_id: '1234',
+    });
+
+    // Creating a transfer statement TO another user
+    const transferSenderStatement = await statementsRepository.create({
+      type: OperationType.TRANSFER,
+      amount: 500,
+      description: 'Statement description sample',
+      user_id: userId,
+      receiver_id: '1234',
     });
 
     // Getting the user balance and statements
@@ -46,16 +62,27 @@ describe('Get balance use case', () => {
 
     // Calculating the balance to compare
     const calculatedBalance = statements.reduce((acc, operation) => {
-      if (operation.type === 'deposit') {
+      const isDeposit = operation.type === OperationType.DEPOSIT;
+      const isTransferReceiver =
+        operation.type === OperationType.TRANSFER && operation.sender_id;
+
+      if (isDeposit || isTransferReceiver) {
         return acc + operation.amount;
       } else {
         return acc - operation.amount;
       }
     }, 0);
 
+    // Checking the balance
     expect(typeof balance).toBe('number');
     expect(balance).toEqual(calculatedBalance);
-    expect(statements[0]).toMatchObject(statement);
+    /* Checking the with an predefined value since the balance calculation may
+    have unexpected results */
+    expect(balance).toEqual(1500);
+    // Checking the statements
+    expect(statements[0]).toMatchObject(depositStatement);
+    expect(statements[1]).toMatchObject(transferReceiverStatement);
+    expect(statements[2]).toMatchObject(transferSenderStatement);
   });
 
   it('should not be able to get the balance of a non-existent user', async () => {

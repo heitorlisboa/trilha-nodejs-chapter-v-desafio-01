@@ -6,8 +6,11 @@ import {
   IGetBalanceDTOWithStatementTrue,
 } from '../useCases/getBalance/IGetBalanceDTO';
 
+export type ICreateStatementDTOAllInfo = ICreateStatementDTO &
+  Partial<Pick<Statement, 'sender_id'>>;
+
 export interface IStatementsRepository {
-  create: (data: ICreateStatementDTO) => Promise<Statement>;
+  create: (data: ICreateStatementDTOAllInfo) => Promise<Statement>;
   findStatementOperation: (
     data: IGetStatementOperationDTO
   ) => Promise<Statement | undefined>;
